@@ -1,6 +1,6 @@
 # Technical Documentation Index: AI-Powered Predictive Maintenance for IoT Devices
 
-Welcome to the technical documentation repository for the **AI-Powered Predictive Maintenance for IoT Devices** platform. This directory contains detailed system architecture designs, data flow patterns, module contracts, model documentation, and interview preparation guides.
+Welcome to the technical documentation repository for the **AI-Powered Predictive Maintenance for IoT Devices** platform. This directory contains detailed system architecture designs, data flow patterns, module contracts, model specifications, and execution logs.
 
 ---
 
@@ -8,7 +8,6 @@ Welcome to the technical documentation repository for the **AI-Powered Predictiv
 
 | Document | Primary Focus | Key Contents |
 | :--- | :--- | :--- |
-| [**Technical Interview Guide**](INTERVIEW_GUIDE.md) | **Comprehensive Interview Preparation** | 20 deep-dive technical questions & model answers covering architecture, physics formulas, data flow, metrics, threshold optimization, error analysis, streaming buffer, latency benchmarks, and limitations. |
 | [**System Architecture**](architecture.md) | Architectural Topologies & Subsystems | Component layout, offline batch training vs. streaming runtime pipelines, subsystem design principles, and latency boundaries. |
 | [**Data Pipeline & Flow**](data_pipeline_and_flow.md) | Telemetry Lifecycle & Data Movement | Step-by-step tracing from raw CSV ingestion through stratified splitting, feature engineering, pipeline transformation, streaming FIFO buffering, and dashboard presentation. |
 | [**Modules & Components**](modules_and_components.md) | Codebase Structure & API Contracts | Complete functional breakdown of all modules in `src/`, `src/data/`, `src/features/`, `src/streaming/`, `src/dashboard/`, and `app.py`. |
