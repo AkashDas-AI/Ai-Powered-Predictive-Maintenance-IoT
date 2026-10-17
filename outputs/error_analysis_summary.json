@@ -1,0 +1,33 @@
+{
+  "decision_threshold": 0.6732,
+  "total_test_samples": 2000,
+  "confusion_breakdown": {
+    "true_negatives": 1926,
+    "true_positives": 53,
+    "false_positives": 6,
+    "false_negatives": 15
+  },
+  "false_negatives_audit": {
+    "total_false_negatives": 15,
+    "failure_mode_breakdown": {
+      "TWF": 9,
+      "HDF": 1,
+      "PWF": 1,
+      "OSF": 2,
+      "RNF": 0
+    },
+    "unattributed_failures": 2,
+    "observations": "The majority of false negatives correspond to Tool Wear Failure (TWF). In TWF, degradation is probabilistic over active wear time (200-240 min) while instantaneous temperatures, torque, and speeds remain within normal operating bands."
+  },
+  "false_positives_audit": {
+    "total_false_positives": 6,
+    "failure_mode_breakdown": {
+      "TWF": 0,
+      "HDF": 0,
+      "PWF": 0,
+      "OSF": 0,
+      "RNF": 1
+    },
+    "observations": "False positives are concentrated at severe mechanical stress operating boundaries (spindle torque > 50 Nm or rotational speed near stall limits). Notably, one false positive (UDI 5490) was flagged with random failure (RNF=1) in the generator despite Machine failure=0."
+  }
+}

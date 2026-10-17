@@ -1,0 +1,57 @@
+{
+  "dataset": "UCI AI4I 2020 Predictive Maintenance",
+  "random_state": 42,
+  "split_sizes": {
+    "train_samples": 8000,
+    "test_samples": 2000,
+    "train_failures": 271,
+    "test_failures": 68,
+    "test_failure_prevalence": 0.034
+  },
+  "selected_model": "Random_Forest_Balanced",
+  "selection_metric": "mean_cv_avg_precision",
+  "selected_model_cv_results": {
+    "model": "Random_Forest_Balanced",
+    "mean_cv_avg_precision": 0.8521,
+    "std_cv_avg_precision": 0.0328,
+    "oof_avg_precision": 0.8537,
+    "mean_cv_roc_auc": 0.9774,
+    "std_cv_roc_auc": 0.0143,
+    "oof_roc_auc": 0.9762,
+    "mean_cv_f1": 0.7368,
+    "oof_f1": 0.7365,
+    "oof_precision": 0.6791,
+    "oof_recall": 0.8044
+  },
+  "threshold_tuning_oof": {
+    "selected_threshold": 0.6732,
+    "training_oof_f1_at_threshold": 0.7984,
+    "selection_strategy": "Maximized F1 on training out-of-fold predictions without test set leakage"
+  },
+  "test_metrics_default_threshold_0_5": {
+    "threshold": 0.5,
+    "positive_prevalence": 0.034,
+    "average_precision": 0.8394,
+    "roc_auc": 0.9754,
+    "f1_score": 0.7317,
+    "precision": 0.625,
+    "recall": 0.8824,
+    "true_negatives": 1896,
+    "false_positives": 36,
+    "false_negatives": 8,
+    "true_positives": 60
+  },
+  "test_metrics_selected_threshold": {
+    "threshold": 0.6732,
+    "positive_prevalence": 0.034,
+    "average_precision": 0.8394,
+    "roc_auc": 0.9754,
+    "f1_score": 0.8346,
+    "precision": 0.8983,
+    "recall": 0.7794,
+    "true_negatives": 1926,
+    "false_positives": 6,
+    "false_negatives": 15,
+    "true_positives": 53
+  }
+}

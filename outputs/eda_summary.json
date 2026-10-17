@@ -1,0 +1,21 @@
+{
+  "dataset": "AI4I 2020 Predictive Maintenance",
+  "total_rows": 10000,
+  "total_columns": 14,
+  "missing_values": 0,
+  "duplicate_rows": 0,
+  "target_counts": {
+    "0": 9661,
+    "1": 339
+  },
+  "class_imbalance_ratio": 28.5,
+  "failure_mode_counts": {
+    "HDF": 115,
+    "OSF": 98,
+    "PWF": 95,
+    "TWF": 46,
+    "RNF": 19
+  },
+  "unattributed_failures": 9,
+  "rnf_without_failure_flag": 18
+}

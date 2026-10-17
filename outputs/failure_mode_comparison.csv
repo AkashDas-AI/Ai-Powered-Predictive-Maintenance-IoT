@@ -1,0 +1,6 @@
+failure_mode,modeling_status,train_positive_count,prevalence_percent,mean_cv_avg_precision,mean_cv_roc_auc,mean_cv_f1,mean_cv_recall,mean_cv_precision,notes
+TWF,Exploratory CV Baseline,36,0.46,0.0613,0.9304,0.125,0.5556,0.0704,Evaluated on training partition via 5-fold CV (threshold = 0.50).
+HDF,Exploratory CV Baseline,86,1.15,0.9841,0.9998,0.9266,0.9535,0.9011,Evaluated on training partition via 5-fold CV (threshold = 0.50).
+PWF,Exploratory CV Baseline,82,0.95,0.9992,1.0,0.9878,0.9878,0.9878,Evaluated on training partition via 5-fold CV (threshold = 0.50).
+OSF,Exploratory CV Baseline,82,0.98,0.8225,0.9964,0.6733,0.8293,0.5667,Evaluated on training partition via 5-fold CV (threshold = 0.50).
+RNF,Descriptive Only (Unviable),15,0.19,,,,,,"NOT VIABLE FOR CLASSIFICATION: Simulated as a 0.1% independent random Bernoulli trial independent of physical parameters. With only 15 training positives (~3 per CV fold), training a predictive model is statistically invalid and models pure noise."

@@ -1,0 +1,112 @@
+{
+  "dataset": "UCI AI4I 2020 Predictive Maintenance",
+  "failure_modes_summary": {
+    "TWF": {
+      "viable_for_modeling": true,
+      "full_dataset_count": 46,
+      "train_count": 36,
+      "test_count": 10,
+      "prevalence_percent": 0.46,
+      "rationale": "Viable for exploratory cross-validation baseline."
+    },
+    "HDF": {
+      "viable_for_modeling": true,
+      "full_dataset_count": 115,
+      "train_count": 86,
+      "test_count": 29,
+      "prevalence_percent": 1.15,
+      "rationale": "Viable for exploratory cross-validation baseline."
+    },
+    "PWF": {
+      "viable_for_modeling": true,
+      "full_dataset_count": 95,
+      "train_count": 82,
+      "test_count": 13,
+      "prevalence_percent": 0.95,
+      "rationale": "Viable for exploratory cross-validation baseline."
+    },
+    "OSF": {
+      "viable_for_modeling": true,
+      "full_dataset_count": 98,
+      "train_count": 82,
+      "test_count": 16,
+      "prevalence_percent": 0.98,
+      "rationale": "Viable for exploratory cross-validation baseline."
+    },
+    "RNF": {
+      "viable_for_modeling": false,
+      "full_dataset_count": 19,
+      "train_count": 15,
+      "test_count": 4,
+      "prevalence_percent": 0.19,
+      "rationale": "NOT VIABLE FOR CLASSIFICATION: Simulated as a 0.1% independent random Bernoulli trial independent of physical parameters. With only 15 training positives (~3 per CV fold), training a predictive model is statistically invalid and models pure noise."
+    }
+  },
+  "exploratory_cv_results": [
+    {
+      "failure_mode": "TWF",
+      "modeling_status": "Exploratory CV Baseline",
+      "train_positive_count": 36,
+      "prevalence_percent": 0.46,
+      "mean_cv_avg_precision": 0.0613,
+      "mean_cv_roc_auc": 0.9304,
+      "mean_cv_f1": 0.125,
+      "mean_cv_recall": 0.5556,
+      "mean_cv_precision": 0.0704,
+      "notes": "Evaluated on training partition via 5-fold CV (threshold = 0.50)."
+    },
+    {
+      "failure_mode": "HDF",
+      "modeling_status": "Exploratory CV Baseline",
+      "train_positive_count": 86,
+      "prevalence_percent": 1.15,
+      "mean_cv_avg_precision": 0.9841,
+      "mean_cv_roc_auc": 0.9998,
+      "mean_cv_f1": 0.9266,
+      "mean_cv_recall": 0.9535,
+      "mean_cv_precision": 0.9011,
+      "notes": "Evaluated on training partition via 5-fold CV (threshold = 0.50)."
+    },
+    {
+      "failure_mode": "PWF",
+      "modeling_status": "Exploratory CV Baseline",
+      "train_positive_count": 82,
+      "prevalence_percent": 0.95,
+      "mean_cv_avg_precision": 0.9992,
+      "mean_cv_roc_auc": 1.0,
+      "mean_cv_f1": 0.9878,
+      "mean_cv_recall": 0.9878,
+      "mean_cv_precision": 0.9878,
+      "notes": "Evaluated on training partition via 5-fold CV (threshold = 0.50)."
+    },
+    {
+      "failure_mode": "OSF",
+      "modeling_status": "Exploratory CV Baseline",
+      "train_positive_count": 82,
+      "prevalence_percent": 0.98,
+      "mean_cv_avg_precision": 0.8225,
+      "mean_cv_roc_auc": 0.9964,
+      "mean_cv_f1": 0.6733,
+      "mean_cv_recall": 0.8293,
+      "mean_cv_precision": 0.5667,
+      "notes": "Evaluated on training partition via 5-fold CV (threshold = 0.50)."
+    },
+    {
+      "failure_mode": "RNF",
+      "modeling_status": "Descriptive Only (Unviable)",
+      "train_positive_count": 15,
+      "prevalence_percent": 0.19,
+      "mean_cv_avg_precision": NaN,
+      "mean_cv_roc_auc": NaN,
+      "mean_cv_f1": NaN,
+      "mean_cv_recall": NaN,
+      "mean_cv_precision": NaN,
+      "notes": "NOT VIABLE FOR CLASSIFICATION: Simulated as a 0.1% independent random Bernoulli trial independent of physical parameters. With only 15 training positives (~3 per CV fold), training a predictive model is statistically invalid and models pure noise."
+    }
+  ],
+  "label_inconsistencies": {
+    "unattributed_failures_count": 9,
+    "rnf_without_failure_flag_count": 18,
+    "description": "9 records have Machine failure=1 with all failure mode flags=0. 18 records have RNF=1 with Machine failure=0. Original labels are strictly preserved without modification."
+  }
+}

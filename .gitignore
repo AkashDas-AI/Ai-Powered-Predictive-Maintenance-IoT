@@ -1,0 +1,73 @@
+# Virtual Environment
+.venv/
+venv/
+env/
+ENV/
+
+# Python Cache & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Jupyter & Notebooks
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+
+# Secrets & Environment Variables
+.env
+.env.*
+!.env.example
+
+# OS & Editor Files
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Models & Serialized Artifacts
+models/*
+!models/.gitkeep
+!models/selected_model.joblib
+
+# Outputs & Evaluation Metrics
+outputs/*
+!outputs/.gitkeep
+!outputs/eda_summary.json
+!outputs/model_comparison.csv
+!outputs/test_metrics.json
+!outputs/confusion_matrix.csv
+!outputs/permutation_importance.csv
+!outputs/test_predictions.csv
+!outputs/error_analysis_summary.json
+!outputs/failure_mode_comparison.csv
+!outputs/failure_mode_analysis.json
+
+# Dataset Storage
+data/*
+!data/.gitkeep
+!data/raw/
+data/raw/*
+!data/raw/.gitkeep
+!data/raw/ai4i2020.csv
+data/raw/*.zip
+data/processed/
+data/synthetic/
+
+# Images (keep directory and tracked assets)
+!images/
+!images/.gitkeep
+
+# Temporary & Log Files
+*.log
+scratch/
+
+
