@@ -41,43 +41,83 @@ This is an educational and engineering simulation. It demonstrates how to decoup
 
 ## 4. Architecture and Workflow
 
-The system separates batch training from real-time streaming inference:
-
-![System Architecture Diagram](images/architecture_diagram.png)
+The system implements a dual-plane architecture that strictly decouples offline batch model development from real-time streaming telemetry and low-latency inference:
 
 ```
-[Batch Training Workflow]
-  data/raw/ai4i2020.csv
-           |
-           v
-  Stratified Train/Test Split (80% Train / 20% Test)
-           |
-           +------------------------------+
-           v (Train: N=8,000)             v (Held-out Test: N=2,000)
-  5-Fold Stratified Cross-Validation     Isolated Evaluation (Evaluated Once)
-           |                                      |
-  Threshold Tuning (OOF F1 Max)                   |
-           |                                      |
-  Fit Final Pipeline on Full Train                |
-           |                                      |
-           v                                      v
-  models/selected_model.joblib          outputs/test_metrics.json
+========================================================================================================================
+                                      HIGH-LEVEL SYSTEM ARCHITECTURE OVERVIEW
+========================================================================================================================
 
-[Streaming Telemetry Runtime]
-  [Telemetry Simulator] (Replays AI4I Benchmark Records)
-           |
-           v
-  [Sliding-Window Buffer] (Bounded FIFO, Capacity W=10)
-           |  +--> Diagnostic Rolling Statistics (Mean, Min, Max, Std)
-           |       (Displayed in Dashboard; NEVER passed to Model)
-           v
-  [Inference Service] (Single Model Load, 8 Instantaneous Features)
-           |
-           v
-  [Alert Classifier & Demonstration Health Index]
-           |
-           v
-  [Streamlit Dashboard (app.py)] (Overview, Replay, Trends, Diagnostics)
+  [ PLANE 1: OFFLINE BATCH TRAINING & EVALUATION PIPELINE ]
+  +------------------------------------------------------------------------------------------------------------------+
+  | 1. Raw Dataset Ingestion: UCI AI4I 2020 Predictive Maintenance Benchmark (10,000 samples x 14 columns)           |
+  |    |-- Validation Layer (src/data/loader.py, validator.py, schema.py): Null/Duplicate/Range Assertions          |
+  |    \-- Target: Machine failure (96.61% Normal [0] vs. 3.39% Failure [1] | Imbalance Ratio: 28.5 to 1)            |
+  |                                                                                                                  |
+  | 2. Deterministic Stratified Split (src/features/split.py): random_state=42                                       |
+  |    |-- Training Partition: N = 8,000 (80% | 271 Failures) ---------------------+                                 |
+  |    \-- Held-Out Test Partition: N = 2,000 (20% | 68 Failures) -------------+   | (Fold/Test Isolation Guard)     |
+  |                                                                           |   |                                  |
+  | 3. Domain Physics Feature Engineering (src/features/engineering.py)       |   |                                  |
+  |    |-- Thermal Differential: Delta T = Process Temp [K] - Air Temp [K]     |   |                                  |
+  |    \-- Shaft Mechanical Power: P_mech = Torque [Nm] * (RPM * 2*pi / 60)    |   |                                  |
+  |                                                                           |   |                                  |
+  | 4. Preprocessing & Model Pipeline (src/features/preprocessing.py)         |   |                                  |
+  |    |-- ColumnTransformer: SimpleImputer(median) + StandardScaler (Numeric)|   |                                  |
+  |    |                      SimpleImputer(frequent) + OneHotEncoder (Type)  |   |                                  |
+  |    |-- Classifier: BalancedRandomForestClassifier(n_estimators=100)       |   |                                  |
+  |    \-- Feature Contract: 8 Instantaneous Inputs (Prohibited: UDI,         |   |                                  |
+  |                          Product ID, Target, and 5 Failure Flags)         |   |                                  |
+  |                                                                           |   |                                  |
+  | 5. Model Selection & Threshold Optimization (src/train.py)                |   |                                  |
+  |    |-- Stratified 5-Fold Cross-Validation on Train:                       |   |                                  |
+  |    |   Balanced Random Forest (Mean CV AP = 0.8521, ROC-AUC = 0.9786)     |   |                                  |
+  |    \-- Out-of-Fold Threshold Tuning: Maximize F1 without test leak        |   |                                  |
+  |        Optimal Decision Threshold: tau* = 0.6732 (OOF F1 = 0.7984)        |   |                                  |
+  |                                                                           |   |                                  |
+  | 6. Production Model Serialization: models/selected_model.joblib <---------+---+                                  |
+  |                                                                           |                                      |
+  | 7. Single Held-Out Evaluation (src/evaluate.py, diagnostics.py): <--------+                                      |
+  |    |-- Evaluated ONCE at tau* = 0.6732 (outputs/test_metrics.json, confusion_matrix.csv)                         |
+  |    \-- Results: AP: 0.8394 | ROC-AUC: 0.9754 | F1: 0.8346 | Precision: 89.83% | Recall: 77.94% | FPR: 0.31%    |
+  +--------------------------------------------+---------------------------------------------------------------------+
+                                               | Pipeline Serialized (.joblib)
+                                               v Preloaded ONCE into Memory
+  [ PLANE 2: REAL-TIME STREAMING TELEMETRY & MONITORING RUNTIME ]
+  +--------------------------------------------+---------------------------------------------------------------------+
+  |                                                                                                                  |
+  |   [Virtual Telemetry Simulator] (src/streaming/simulator.py)                                                     |
+  |   - Replays benchmark test partition records sequentially or with reproducible seeded shuffle                    |
+  |   - Generates simulated point-in-time sensor packets with physical range and sensor validity assertions          |
+  |                                    | Stream Packet: {seq_id, timestamp, Type, 5 raw sensor readings}             |
+  |                                    v                                                                             |
+  |   [Bounded Sliding-Window Buffer] (src/streaming/buffer.py)                                                      |
+  |   - Thread-safe FIFO circular buffer (capacity W = 10, collections.deque) with deep-copy immutability           |
+  |   - Computes rolling window statistics (mean, min, max, sample std ddof=1) across numerical channels            |
+  |   * DECOUPLING GUARD: Rolling statistics are for dashboard display only; NEVER passed to model feature matrix.  |
+  |                                    | Instantaneous 8-Feature Vector (Type, 5 Raw Sensors, Delta T, P_mech)        |
+  |                                    v                                                                             |
+  |   [Streaming Inference Service] (src/streaming/inference.py)                                                     |
+  |   - Low-latency inference wrapper preloading serialized pipeline in memory                                       |
+  |   - Deterministic row-wise physics calculation; asserts all prohibited columns excluded                         |
+  |   - Evaluates predict_proba() -> failure probability | Latency benchmark: < 30 ms median (sub-50 ms target met)  |
+  |                                    | Inference Payload: {probability, alert_state, health_index, latency_ms}     |
+  |                                    v                                                                             |
+  |   [Alert Engine & Health Classifier] (src/streaming/alerts.py)                                                   |
+  |   - Operational Alert Tiers: NORMAL (<0.30) | WATCH (0.30-0.50) | WARNING (0.50-0.6732) | CRITICAL (>=0.6732)   |
+  |   - Hysteresis logic and cooldown counters to suppress alert fatigue                                             |
+  |   - Demonstration Health Index = 100.0 * (1.0 - P(failure))                                                      |
+  |                                    |                                                                             |
+  |                                    v                                                                             |
+  |   [Interactive Streamlit Monitoring Dashboard] (app.py)                                                          |
+  |   - Orchestrated by session state manager (src/dashboard/state.py) with defensive table fallbacks                |
+  |   - Tab 1: Fleet & Machine Overview (Operational badge, failure probability gauge, instantaneous sensor cards)   |
+  |   - Tab 2: Live Telemetry Simulation (Step single, batch runner 5/10/25, replay ordering, event history)         |
+  |   - Tab 3: Sensor Trends & Buffer Diagnostics (Synchronized Plotly charts, active rolling statistics)            |
+  |   - Tab 4: Model Diagnostics & Scorecard (Held-out test metrics, permutation importance, scientific limits)      |
+  |                                                                                                                  |
+  +------------------------------------------------------------------------------------------------------------------+
+========================================================================================================================
 ```
 
 For detailed specifications, see the documentation in the `docs/` directory:
@@ -145,36 +185,31 @@ At the selected threshold of 0.6732, false positives dropped from 36 to 6, incre
 
 This section compiles visual evidence from dataset exploration, model evaluation, the live dashboard, and terminal telemetry streaming.
 
-### System Architecture
-![System Architecture Diagram](images/architecture_diagram.png)
-
-*Figure 1: Dual-plane architecture separating offline batch training and leakage-safe preprocessing from real-time streaming runtime and bounded FIFO buffering.*
-
 ### Dataset and Exploratory Analysis
 ![Dataset Class Imbalance](images/target_distribution.png)
 
-*Figure 2: Binary target distribution in the UCI AI4I 2020 dataset showing severe class imbalance (96.61% normal vs. 3.39% failure).*
+*Figure 1: Binary target distribution in the UCI AI4I 2020 dataset showing severe class imbalance (96.61% normal vs. 3.39% failure).*
 
 ![Correlation Matrix Heatmap](images/correlation_matrix.png)
 
-*Figure 3: Correlation heatmap across continuous sensor channels and failure indicators.*
+*Figure 2: Correlation heatmap across continuous sensor channels and failure indicators.*
 
 ![Physics-Informed Feature Engineering](images/feature_engineering.png)
 
-*Figure 4: First-principles physical derivations for thermal differential and shaft mechanical power alongside strict leakage exclusion boundaries.*
+*Figure 3: First-principles physical derivations for thermal differential and shaft mechanical power alongside strict leakage exclusion boundaries.*
 
 ### Model Evaluation and Explainability
 ![Held-Out Test Confusion Matrix](images/confusion_matrix.png)
 
-*Figure 5: Held-out test set confusion matrix (N=2,000) at optimized threshold tau* = 0.6732, achieving 89.83% precision, 77.94% recall, and 0.31% false positive rate.*
+*Figure 4: Held-out test set confusion matrix (N=2,000) at optimized threshold tau* = 0.6732, achieving 89.83% precision, 77.94% recall, and 0.31% false positive rate.*
 
 ![Permutation Feature Importance](images/permutation_importance.png)
 
-*Figure 6: Permutation feature importance on test data (scoring: average precision), identifying rotational speed and thermal differential as dominant predictors.*
+*Figure 5: Permutation feature importance on test data (scoring: average precision), identifying rotational speed and thermal differential as dominant predictors.*
 
 ![Error Analysis by Failure Mode](images/error_analysis.png)
 
-*Figure 7: Forensic audit of test false negatives and false positives broken down across mechanical failure modes.*
+*Figure 6: Forensic audit of test false negatives and false positives broken down across mechanical failure modes.*
 
 ### Streamlit Dashboard
 The interactive Streamlit dashboard (`app.py`) provides an operator interface with 4 dedicated functional tabs:

@@ -11,84 +11,122 @@ The system is architected as two decoupled sub-systems:
 2. **Real-Time Streaming & Monitoring Runtime**: A lightweight, memory-resident inference engine that simulates edge IoT sensor streaming, sliding-window buffering, low-latency scoring, and interactive web dashboard visualization.
 
 ```
-+-------------------------------------------------------------------------------------------------+
-|                                 1. OFFLINE BATCH TRAINING PIPELINE                              |
-+-------------------------------------------------------------------------------------------------+
-|                                                                                                 |
-|   [Raw Dataset]                                                                                 |
-|   data/raw/ai4i2020.csv (10,000 samples, 14 columns)                                            |
-|         │                                                                                       |
-|         ▼                                                                                       |
-|   [Data Ingestion & Validation Layer] (src.data.loader, src.data.validator)                     |
-|   - Reusable loader with project-root relative resolution                                       |
-|   - Schema validation, null checks, duplicate audits, physical range assertions                 |
-|         │                                                                                       |
-|         ▼                                                                                       |
-|   [Stratified Split Layer] (src.features.split)                                                 |
-|   - Stratified 80/20 train/test split (random_state=42)                                         |
-|   - Training: N=8,000 (271 failures) | Held-Out Test: N=2,000 (68 failures)                     |
-|         │                                                                                       |
-|         ▼                                                                                       |
-|   [Domain Feature Engineering] (src.features.engineering)                                       |
-|   - Temperature Differential: ΔT = Process Temp [K] - Air Temp [K]                              |
-|   - Shaft Mechanical Power: P_mech = Torque [Nm] * (Rotational speed [rpm] * 2π / 60) [W]       |
-|         │                                                                                       |
-|         ▼                                                                                       |
-|   [Scikit-Learn Pipeline Encapsulation] (src.features.preprocessing, src.train)                 |
-|   - Numeric: SimpleImputer(median) + StandardScaler                                             |
-|   - Categorical (Type): SimpleImputer(most_frequent) + OneHotEncoder(handle_unknown='ignore')   |
-|   - Classifier: Balanced Random Forest (100 estimators, max_depth=10, class_weight='balanced')  |
-|         │                                                                                       |
-|         ▼                                                                                       |
-|   [Evaluation & Threshold Optimization] (src.evaluate)                                          |
-|   - Stratified 5-Fold Cross-Validation on training partition (Mean CV Avg Precision = 0.8521)   |
-|   - Out-of-fold (OOF) threshold grid search to maximize F1 (Optimal: τ* = 0.6732)               |
-|         │                                                                                       |
-|         ├───────────────────────────────────────────┐                                           |
-|         ▼                                           ▼                                           |
-|   [Serialized Artifact]                       [Evaluation Reports]                              |
-|   models/selected_model.joblib (1.62 MB)      outputs/test_metrics.json                         |
-|                                               outputs/permutation_importance.csv                |
-|                                               outputs/test_predictions.csv                      |
-+-------------------------------------------------------------------------------------------------+
+========================================================================================================================
+                                      HIGH-LEVEL SYSTEM ARCHITECTURE OVERVIEW
+========================================================================================================================
 
-+-------------------------------------------------------------------------------------------------+
-|                               2. REAL-TIME STREAMING & MONITORING RUNTIME                       |
-+-------------------------------------------------------------------------------------------------+
-|                                                                                                 |
-|   [Virtual Telemetry Simulator] (src.streaming.simulator)                                       |
-|   - Replays AI4I benchmark records sequentially or with reproducible seeded shuffle             |
-|   - Validates physical boundary constraints per record (SENSOR_PHYSICAL_BOUNDS)                 |
-|         │ Incremental Telemetry Record                                                          |
-|         ▼                                                                                       |
-|   [Bounded Sliding-Window Buffer] (src.streaming.buffer)                                        |
-|   - Bounded FIFO deque (default capacity W = 10 samples)                                        |
-|   - Deep-copy guarantees protecting buffer immutability                                         |
-|   - Computes rolling statistics (mean, min, max, sample std with Bessel's correction ddof=1)   |
-|   * DIAGNOSTIC SEPARATION: Window statistics are for display only; NEVER fed to model.          |
-|         │ Instantaneous 8-Feature Vector                                                        |
-|         ▼                                                                                       |
-|   [Streaming Inference Service] (src.streaming.inference)                                       |
-|   - Preloads models/selected_model.joblib ONCE at initialization into memory                    |
-|   - Applies engineer_features() deterministically                                               |
-|   - Enforces prohibited column exclusions (UDI, Product ID, Target, Failure modes)              |
-|   - Evaluates predict_proba() -> failure probability                                            |
-|   - Measures pure scoring latency with high-resolution monotonic timer (time.perf_counter)      |
-|         │ Inference Output Payload                                                              |
-|         ▼                                                                                       |
-|   [Operational Alert & Health Classifier] (src.streaming.alerts)                                |
-|   - 4-Tier Operational Alerts: NORMAL (<0.30), WATCH (0.30-0.50), WARNING (0.50-0.6732),        |
-|     CRITICAL (≥0.6732)                                                                          |
-|   - Demonstration Health Index = 100.0 * (1.0 - P(failure))                                     |
-|         │                                                                                       |
-|         ▼                                                                                       |
-|   [Interactive Streamlit Dashboard] (app.py)                                                    |
-|   - Orchestrated by src.dashboard.state.DashboardSession                                        |
-|   - Tab 1: Fleet & Machine Overview (Status badge, risk gauge, health index, metric cards)      |
-|   - Tab 2: Live Telemetry Simulation (Step sample, batch runner, replay modes, history table)   |
-|   - Tab 3: Sensor Trends & Diagnostics (4 synchronized Plotly charts, rolling stats table)      |
-|   - Tab 4: Model Diagnostics & Limitations (Test metrics scorecard, permutation chart, notes)  |
-+-------------------------------------------------------------------------------------------------+
+  [ PLANE 1: OFFLINE BATCH TRAINING & EVALUATION PIPELINE ]
+  +------------------------------------------------------------------------------------------------------------------+
+  | 1. Raw Dataset Ingestion: UCI AI4I 2020 Predictive Maintenance Benchmark (10,000 samples x 14 columns)           |
+  |    |-- Validation Layer (src/data/loader.py, validator.py, schema.py): Null/Duplicate/Range Assertions          |
+  |    \-- Target: Machine failure (96.61% Normal [0] vs. 3.39% Failure [1] | Imbalance Ratio: 28.5 to 1)            |
+  |                                                                                                                  |
+  | 2. Deterministic Stratified Split (src/features/split.py): random_state=42                                       |
+  |    |-- Training Partition: N = 8,000 (80% | 271 Failures) ---------------------+                                 |
+  |    \-- Held-Out Test Partition: N = 2,000 (20% | 68 Failures) -------------+   | (Fold/Test Isolation Guard)     |
+  |                                                                           |   |                                  |
+  | 3. Domain Physics Feature Engineering (src/features/engineering.py)       |   |                                  |
+  |    |-- Thermal Differential: Delta T = Process Temp [K] - Air Temp [K]     |   |                                  |
+  |    \-- Shaft Mechanical Power: P_mech = Torque [Nm] * (RPM * 2*pi / 60)    |   |                                  |
+  |                                                                           |   |                                  |
+  | 4. Preprocessing & Model Pipeline (src/features/preprocessing.py)         |   |                                  |
+  |    |-- ColumnTransformer: SimpleImputer(median) + StandardScaler (Numeric)|   |                                  |
+  |    |                      SimpleImputer(frequent) + OneHotEncoder (Type)  |   |                                  |
+  |    |-- Classifier: BalancedRandomForestClassifier(n_estimators=100)       |   |                                  |
+  |    \-- Feature Contract: 8 Instantaneous Inputs (Prohibited: UDI,         |   |                                  |
+  |                          Product ID, Target, and 5 Failure Flags)         |   |                                  |
+  |                                                                           |   |                                  |
+  | 5. Model Selection & Threshold Optimization (src/train.py)                |   |                                  |
+  |    |-- Stratified 5-Fold Cross-Validation on Train:                       |   |                                  |
+  |    |   Balanced Random Forest (Mean CV AP = 0.8521, ROC-AUC = 0.9786)     |   |                                  |
+  |    \-- Out-of-Fold Threshold Tuning: Maximize F1 without test leak        |   |                                  |
+  |        Optimal Decision Threshold: tau* = 0.6732 (OOF F1 = 0.7984)        |   |                                  |
+  |                                                                           |   |                                  |
+  | 6. Production Model Serialization: models/selected_model.joblib <---------+---+                                  |
+  |                                                                           |                                      |
+  | 7. Single Held-Out Evaluation (src/evaluate.py, diagnostics.py): <--------+                                      |
+  |    |-- Evaluated ONCE at tau* = 0.6732 (outputs/test_metrics.json, confusion_matrix.csv)                         |
+  |    \-- Results: AP: 0.8394 | ROC-AUC: 0.9754 | F1: 0.8346 | Precision: 89.83% | Recall: 77.94% | FPR: 0.31%    |
+  +--------------------------------------------+---------------------------------------------------------------------+
+                                               | Pipeline Serialized (.joblib)
+                                               v Preloaded ONCE into Memory
+  [ PLANE 2: REAL-TIME STREAMING TELEMETRY & MONITORING RUNTIME ]
+  +--------------------------------------------+---------------------------------------------------------------------+
+  |                                                                                                                  |
+  |   [Virtual Telemetry Simulator] (src/streaming/simulator.py)                                                     |
+  |   - Replays benchmark test partition records sequentially or with reproducible seeded shuffle                    |
+  |   - Generates simulated point-in-time sensor packets with physical range and sensor validity assertions          |
+  |                                    | Stream Packet: {seq_id, timestamp, Type, 5 raw sensor readings}             |
+  |                                    v                                                                             |
+  |   [Bounded Sliding-Window Buffer] (src/streaming/buffer.py)                                                      |
+  |   - Thread-safe FIFO circular buffer (capacity W = 10, collections.deque) with deep-copy immutability           |
+  |   - Computes rolling window statistics (mean, min, max, sample std ddof=1) across numerical channels            |
+  |   * DECOUPLING GUARD: Rolling statistics are for dashboard display only; NEVER passed to model feature matrix.  |
+  |                                    | Instantaneous 8-Feature Vector (Type, 5 Raw Sensors, Delta T, P_mech)        |
+  |                                    v                                                                             |
+  |   [Streaming Inference Service] (src/streaming/inference.py)                                                     |
+  |   - Low-latency inference wrapper preloading serialized pipeline in memory                                       |
+  |   - Deterministic row-wise physics calculation; asserts all prohibited columns excluded                         |
+  |   - Evaluates predict_proba() -> failure probability | Latency benchmark: < 30 ms median (sub-50 ms target met)  |
+  |                                    | Inference Payload: {probability, alert_state, health_index, latency_ms}     |
+  |                                    v                                                                             |
+  |   [Alert Engine & Health Classifier] (src/streaming/alerts.py)                                                   |
+  |   - Operational Alert Tiers: NORMAL (<0.30) | WATCH (0.30-0.50) | WARNING (0.50-0.6732) | CRITICAL (>=0.6732)   |
+  |   - Hysteresis logic and cooldown counters to suppress alert fatigue                                             |
+  |   - Demonstration Health Index = 100.0 * (1.0 - P(failure))                                                      |
+  |                                    |                                                                             |
+  |                                    v                                                                             |
+  |   [Interactive Streamlit Monitoring Dashboard] (app.py)                                                          |
+  |   - Orchestrated by session state manager (src/dashboard/state.py) with defensive table fallbacks                |
+  |   - Tab 1: Fleet & Machine Overview (Operational badge, failure probability gauge, instantaneous sensor cards)   |
+  |   - Tab 2: Live Telemetry Simulation (Step single, batch runner 5/10/25, replay ordering, event history)         |
+  |   - Tab 3: Sensor Trends & Buffer Diagnostics (Synchronized Plotly charts, active rolling statistics)            |
+  |   - Tab 4: Model Diagnostics & Scorecard (Held-out test metrics, permutation importance, scientific limits)      |
+  |                                                                                                                  |
+  +------------------------------------------------------------------------------------------------------------------+
+========================================================================================================================
+```
+
+### Component Flowchart
+
+```mermaid
+flowchart TD
+    subgraph DataPlane ["Data Ingestion & Validation Layer"]
+        CSV[("UCI AI4I 2020 Dataset<br/>10,000 records x 14 columns")]
+        Val["Data Validator & Schema Checker<br/>src/data/validator.py"]
+        Split["Stratified Train/Test Split<br/>random_state=42"]
+        CSV --> Val --> Split
+    end
+
+    subgraph BatchPlane ["Plane 1: Offline Batch Training & Evaluation Pipeline"]
+        Split -->|"80% Train (N=8,000)"| FeatEng["Physics Feature Engineering<br/>Temp Diff & Shaft Mech Power"]
+        Split -.->|"20% Held-Out Test (N=2,000)"| HeldOutTest["Isolated Test Set Evaluation<br/>Evaluated Exactly ONCE"]
+
+        FeatEng --> Preproc["ColumnTransformer Preprocessor<br/>Imputers + StandardScaler + OneHot"]
+        Preproc --> ModelFit["Pipeline Model Fitting<br/>BalancedRandomForestClassifier"]
+
+        ModelFit --> CV["Stratified 5-Fold Cross-Validation<br/>Mean CV Avg Precision = 0.8521"]
+        CV --> OOFThreshold["OOF Threshold Optimization<br/>Max F1 -> tau* = 0.6732"]
+        OOFThreshold --> FinalModel[("Production Model Artifact<br/>models/selected_model.joblib")]
+
+        FinalModel --> HeldOutTest
+        HeldOutTest --> TestMetrics[("outputs/test_metrics.json<br/>AP: 0.8394, ROC: 0.9754, F1: 0.8346")]
+    end
+
+    subgraph StreamingPlane ["Plane 2: Real-Time Streaming Telemetry & Monitoring Runtime"]
+        Sim["Virtual Telemetry Simulator<br/>src/streaming/simulator.py"]
+        Buffer["Bounded Sliding-Window FIFO Buffer<br/>src/streaming/buffer.py | W=10"]
+        InfService["Streaming Inference Service<br/>src/streaming/inference.py | Latency < 30ms"]
+        AlertEngine["Alert Hysteresis Engine & Health Classifier<br/>src/streaming/alerts.py"]
+        Dashboard["Interactive Streamlit Dashboard<br/>app.py | 4 Operational Tabs"]
+
+        FinalModel -.->|"Preloads Serialized Pipeline Once"| InfService
+        Sim -->|"Stream Packet: Raw Sensors"| Buffer
+        Sim -->|"Instantaneous 8-Feature Vector"| InfService
+        Buffer -->|"Rolling Statistics: Display Only"| Dashboard
+        InfService -->|"p_failure, Latency"| AlertEngine
+        AlertEngine -->|"Alert Tier & Health Index"| Dashboard
+    end
 ```
 
 ---
