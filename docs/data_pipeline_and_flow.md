@@ -103,6 +103,8 @@ Raw Dataset File [data/raw/ai4i2020.csv] (10,000 rows x 14 columns)
 
 ## 2. Feature Engineering Mathematics
 
+![Physics-Informed Feature Engineering](../images/feature_engineering.png)
+
 The machine learning model operates strictly on instantaneous operational features. Two domain-engineered physical indicators are derived mathematically:
 
 ### 1. Thermal Differential ($\Delta T$)
