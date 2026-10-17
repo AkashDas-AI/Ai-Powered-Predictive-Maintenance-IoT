@@ -43,6 +43,8 @@ This is an educational and engineering simulation. It demonstrates how to decoup
 
 The system separates batch training from real-time streaming inference:
 
+![System Architecture Diagram](images/architecture_diagram.png)
+
 ```
 [Batch Training Workflow]
   data/raw/ai4i2020.csv
@@ -139,29 +141,97 @@ At the selected threshold of 0.6732, false positives dropped from 36 to 6, incre
 
 ---
 
-## 7. Dashboard Showcase
+## 7. Visual Evidence and System Showcase
 
+This section compiles visual evidence from dataset exploration, model evaluation, the live dashboard, and terminal telemetry streaming.
+
+### System Architecture
+![System Architecture Diagram](images/architecture_diagram.png)
+
+*Figure 1: Dual-plane architecture separating offline batch training and leakage-safe preprocessing from real-time streaming runtime and bounded FIFO buffering.*
+
+### Dataset and Exploratory Analysis
+![Dataset Class Imbalance](images/target_distribution.png)
+
+*Figure 2: Binary target distribution in the UCI AI4I 2020 dataset showing severe class imbalance (96.61% normal vs. 3.39% failure).*
+
+![Correlation Matrix Heatmap](images/correlation_matrix.png)
+
+*Figure 3: Correlation heatmap across continuous sensor channels and failure indicators.*
+
+![Physics-Informed Feature Engineering](images/feature_engineering.png)
+
+*Figure 4: First-principles physical derivations for thermal differential and shaft mechanical power alongside strict leakage exclusion boundaries.*
+
+### Model Evaluation and Explainability
+![Held-Out Test Confusion Matrix](images/confusion_matrix.png)
+
+*Figure 5: Held-out test set confusion matrix (N=2,000) at optimized threshold tau* = 0.6732, achieving 89.83% precision, 77.94% recall, and 0.31% false positive rate.*
+
+![Permutation Feature Importance](images/permutation_importance.png)
+
+*Figure 6: Permutation feature importance on test data (scoring: average precision), identifying rotational speed and thermal differential as dominant predictors.*
+
+![Error Analysis by Failure Mode](images/error_analysis.png)
+
+*Figure 7: Forensic audit of test false negatives and false positives broken down across mechanical failure modes.*
+
+### Streamlit Dashboard
 The interactive Streamlit dashboard (`app.py`) provides an operator interface with 4 dedicated functional tabs:
 
-### Fleet and Machine Overview
+#### Fleet and Machine Overview
 Real-time operational status badge (NORMAL, WATCH, WARNING, CRITICAL), failure probability gauge bar, synthetic demonstration health index, cumulative processed sample counts, and instantaneous sensor metrics:
 
 ![Dashboard Overview](images/dashboard_overview.png)
 
-### Live Telemetry Simulation
+#### Live Telemetry Simulation
 Interactive stepping controls (Next Sample, Run Batch of 5, 10, or 25), replay ordering toggle (sequential vs. reproducibly shuffled), dynamic buffer capacity slider, and recent event history:
 
 ![Live Telemetry Simulation](images/dashboard_live_simulation.png)
 
-### Sensor Trends and Buffer Diagnostics
+#### Sensor Trends and Buffer Diagnostics
 Synchronized Plotly charts tracking Spindle Dynamics (Speed vs. Torque), Thermal Profile (Air, Process, Delta T), Tool Wear vs. Mechanical Power, and Model Risk Trajectory alongside rolling window summary statistics:
 
 ![Sensor Trends and Diagnostics](images/dashboard_sensor_trends.png)
 
-### Model Diagnostics and Limitations
+#### Model Diagnostics and Limitations
 Held-out test scorecard, permutation feature importance bar chart, empirical inference latency benchmarks, and transparent discussion of scientific limitations:
 
 ![Model Diagnostics and Limitations](images/dashboard_model_diagnostics.png)
+
+### Virtual Telemetry Demonstration
+Execution of the streaming simulator CLI (`python main.py --samples 5`):
+
+```text
+==========================================================================================
+  IoT Telemetry Streaming & Low-Latency Inference Demonstration (Phase 6)
+==========================================================================================
+Total Stream Samples: 5 | Buffer Capacity: 10 | Decision Threshold: 0.6732
+Simulation Mode: Replaying AI4I benchmark records (Software simulation only)
+------------------------------------------------------------------------------------------
+Seq   | Type | Temp Diff [K] | Speed [rpm] | Torque [Nm] | P(Fail)  | Alert    | HI (%)  | Latency  
+------------------------------------------------------------------------------------------
+1     | M    | 10.50         | 1551        | 42.8        | 0.0019   | NORMAL   | 99.8    | 141.83 ms
+2     | L    | 10.50         | 1408        | 46.3        | 0.0141   | NORMAL   | 98.6    | 32.15 ms
+3     | L    | 10.40         | 1498        | 49.4        | 0.0377   | NORMAL   | 96.2    | 20.32 ms
+4     | L    | 10.40         | 1433        | 39.5        | 0.0076   | NORMAL   | 99.2    | 21.68 ms
+5     | L    | 10.50         | 1408        | 40.0        | 0.0076   | NORMAL   | 99.2    | 29.98 ms
+------------------------------------------------------------------------------------------
+Final Buffer Rolling Diagnostics (Last 10 Records - For Operator Display Only):
+  - Air temperature [K]: Mean=298.16, Min=298.1, Max=298.2, Std=0.0548
+  - Process temperature [K]: Mean=308.62, Min=308.5, Max=308.7, Std=0.0837
+  - Rotational speed [rpm]: Mean=1459.6, Min=1408.0, Max=1551.0, Std=62.9706
+  - Torque [Nm]: Mean=43.6, Min=39.5, Max=49.4, Std=4.2232
+  - Tool wear [min]: Mean=4.8, Min=0.0, Max=9.0, Std=3.4928
+------------------------------------------------------------------------------------------
+Performance Measurement (Local Inference Latency):
+  - Sample Count: 5
+  - Median (P50) Latency: 29.977 ms
+  - 95th Percentile (P95): 119.891 ms
+  - Mean Latency:         49.190 ms (Min: 20.321 ms, Max: 141.827 ms)
+  - Alert Distribution:   {'NORMAL': 5}
+==========================================================================================
+```
 
 ---
 
